@@ -340,8 +340,8 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		            boolean alreadyupdated = false;
 		            if(waterenabled) {
 		            	//See if there is a water block next to it...
-		            	if(hasBlockNextTo(blockupdate.getBlock(), WATER) || 
-		            			hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER)) {
+		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER) || 
+		            			hasBlockNextTo(blockupdate.getBlock(), WATER)) {
 		            		blockupdate.upDelay(generator.nextInt(2));
 			            	if(debug) {
 			            		System.out.println("upped the int to: " + blockupdate.getDelay());
@@ -351,8 +351,8 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		            	//don't want it to happen twice as fast when there is lava...
 		            }if(lavaenabled && !alreadyupdated) {
 		            	//See if there is a lava block next to it...
-		            	if(hasBlockNextTo(blockupdate.getBlock(), LAVA) || 
-		            			hasBlockNextTo(blockupdate.getBlock(), FLOWINGLAVA)) {
+		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGLAVA) || 
+		            			hasBlockNextTo(blockupdate.getBlock(), LAVA)) {
 			            	blockupdate.upDelay(generator.nextInt(2));
 			            	if(debug) {
 			            		System.out.println("upped the int to: " + blockupdate.getDelay());
