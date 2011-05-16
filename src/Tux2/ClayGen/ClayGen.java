@@ -75,10 +75,12 @@ public class ClayGen extends JavaPlugin implements Runnable {
     boolean savefarm = false;
     int farmdelay = 5;
     int maxfarmdelay = 12;
-    String version = "0.6";
+    String version = "0.7";
     LinkedList<ClayDelay> gravellist = new LinkedList<ClayDelay>();
     LinkedList<Block> ingravel = new LinkedList<Block>();
     Random generator = new Random();
+    BlockFace[] waterblocks = {BlockFace.UP, BlockFace.NORTH, BlockFace.SOUTH,
+			BlockFace.EAST, BlockFace.WEST};
 
     public ClayGen(PluginLoader pluginLoader, Server instance, PluginDescriptionFile desc, File folder, File plugin, ClassLoader cLoader) {
         super();
@@ -338,10 +340,18 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	            		(mcmmomode || blockupdate.getBlock().getFace(BlockFace.DOWN).getTypeId() == activateblock)) {
 		            //let's see if water farming is enabled.
 		            boolean alreadyupdated = false;
-		            if(waterenabled) {
+		            if(waterenabled && lavaenabled) {
 		            	//See if there is a water block next to it...
-		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER) || 
-		            			hasBlockNextTo(blockupdate.getBlock(), WATER)) {
+		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER, WATER)) {
+		            		blockupdate.upDelay(generator.nextInt(2));
+			            	if(debug) {
+			            		System.out.println("upped the int to: " + blockupdate.getDelay());
+			            	}
+		            		alreadyupdated = true;
+			            }
+		            }else if(waterenabled) {
+		            	//See if there is a water block next to it...
+		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER, WATER)) {
 		            		blockupdate.upDelay(generator.nextInt(2));
 			            	if(debug) {
 			            		System.out.println("upped the int to: " + blockupdate.getDelay());
@@ -349,10 +359,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		            		alreadyupdated = true;
 			            }
 		            	//don't want it to happen twice as fast when there is lava...
-		            }if(lavaenabled && !alreadyupdated) {
+		            }else if(lavaenabled) {
 		            	//See if there is a lava block next to it...
-		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGLAVA) || 
-		            			hasBlockNextTo(blockupdate.getBlock(), LAVA)) {
+		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGLAVA, LAVA)) {
 			            	blockupdate.upDelay(generator.nextInt(2));
 			            	if(debug) {
 			            		System.out.println("upped the int to: " + blockupdate.getDelay());
@@ -360,7 +369,16 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			            	alreadyupdated = true;
 			            }
 		            }
-		            if(blockupdate.getDelay() >= farmdelay || (blockupdate.getInTime()+(10000*maxfarmdelay)) <= System.currentTimeMillis()) {
+		            if(alreadyupdated == false) {
+		            	if(debug) {
+		            		System.out.println("Whoops! no more flow! Removing...");
+		            	}
+		            	//Remove the block, it's been updated!
+		            	gravellist.remove(blockupdate);
+		            	ingravel.remove(blockupdate.getBlock());
+		            	//Set the pointer to the right location.
+		            	i--;
+		            }else if(blockupdate.getDelay() >= farmdelay || (blockupdate.getInTime()+(10000*maxfarmdelay)) <= System.currentTimeMillis()) {
 		            	//Remove the block, it's been updated!
 		            	gravellist.remove(blockupdate);
 		            	ingravel.remove(blockupdate.getBlock());
@@ -370,16 +388,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		            	if(debug) {
 		            		System.out.println("We now have " + gravellist.size() + " in the queue");
 		            	}
-		            }else if(alreadyupdated == false) {
-		            	if(debug) {
-		            		System.out.println("Whoops! no more flow! Removing...");
-		            	}
-		            	//Remove the block, it's been updated!
-		            	gravellist.remove(blockupdate);
-		            	ingravel.remove(blockupdate.getBlock());
-		            	//Set the pointer to the right location.
-		            	i--;
-		            }
+		            } 
 		            //Remove that non-gravel block
 	            }else {
 	            	gravellist.remove(blockupdate);
@@ -400,13 +409,28 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		
 	}
 	public synchronized boolean hasBlockNextTo(Block theblock, int blockid) {
-		Block thewaterblocks[] = {theblock.getFace(BlockFace.UP),
-				theblock.getFace(BlockFace.NORTH),
-				theblock.getFace(BlockFace.SOUTH),
-				theblock.getFace(BlockFace.EAST),
-				theblock.getFace(BlockFace.WEST)};
-		for (int i = 0; i < thewaterblocks.length; i++) {
-			if(thewaterblocks[i].getTypeId() == blockid) {
+		for (int i = 0; i < waterblocks.length; i++) {
+			if(theblock.getFace(waterblocks[i]).getTypeId() == blockid) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public synchronized boolean hasBlockNextTo(Block theblock, int blockid, int blockid2) {
+		for (int i = 0; i < waterblocks.length; i++) {
+			int id = theblock.getFace(waterblocks[i]).getTypeId();
+			if(id == blockid || id == blockid2) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	public synchronized boolean hasBlockNextTo(Block theblock, int blockid, int blockid2, int blockid3, int blockid4) {
+		for (int i = 0; i < waterblocks.length; i++) {
+			int id = theblock.getFace(waterblocks[i]).getTypeId();
+			if(id == blockid || id == blockid2 || id == blockid3 || id == blockid4) {
 				return true;
 			}
 		}
@@ -421,8 +445,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	            boolean alreadyupdated = false;
 	            if(waterenabled) {
 	            	//See if there is a water block next to it...
-	            	if(hasBlockNextTo(thegravelblock, WATER) || 
-	            			hasBlockNextTo(thegravelblock, FLOWINGWATER)) {
+	            	if(hasBlockNextTo(thegravelblock, WATER, FLOWINGWATER)) {
 	            		ingravel.add(thegravelblock);
 	            		gravellist.add(new ClayDelay(thegravelblock));
 	            		//Only start the thread if nothing is waiting...
@@ -436,8 +459,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	            	//don't want it to add it twice when there is lava...
 	            }if(lavaenabled && !alreadyupdated) {
 	            	//See if there is a lava block next to it...
-	            	if(hasBlockNextTo(thegravelblock, LAVA) || 
-	            			hasBlockNextTo(thegravelblock, FLOWINGLAVA)) {
+	            	if(hasBlockNextTo(thegravelblock, LAVA, FLOWINGLAVA)) {
 	            		ingravel.add(thegravelblock);
 	            		gravellist.add(new ClayDelay(thegravelblock));
 	            		//Only start the thread if nothing is waiting...
