@@ -141,7 +141,6 @@ public class ClayGen extends JavaPlugin implements Runnable {
 
 
 	public synchronized int getActivationBlock() {
-		// for right now just return the value for netherrack.
 		return activateblock;
 	}
 	
