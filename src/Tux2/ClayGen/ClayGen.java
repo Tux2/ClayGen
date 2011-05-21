@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.channels.FileChannel;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -58,7 +59,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
     private final ClayGenPlayerListener playerListener = new ClayGenPlayerListener(this);
     private final ClayGenBlockListener blockListener = new ClayGenBlockListener(this);
     private final HashMap<Player, Boolean> debugees = new HashMap<Player, Boolean>();
+    final HashMap<String, ClayDelay> clayblocks = new HashMap<String, ClayDelay>();
     private String blockSaveFile = "plugins/ClayGen/claygen.blocks";
+    private String claySaveFile = "plugins/ClayGen/claygen.clay";
     private Thread dispatchThread;
     private int activateblock = 45;
     public static final int CLAY = 82;
@@ -73,6 +76,12 @@ public class ClayGen extends JavaPlugin implements Runnable {
     boolean waterenabled = true;
     boolean clayfarm = false;
     boolean savefarm = false;
+    boolean customdrops = false;
+    int maxclay = 6;
+    int minclay = 1;
+    int defaultclaydrop = 4;
+    //Set delay for the max amount of clay to 2 minutes.
+    long timeformaxclay = 2*60*1000;
     int farmdelay = 5;
     int maxfarmdelay = 12;
     String version = "0.7";
@@ -109,6 +118,15 @@ public class ClayGen extends JavaPlugin implements Runnable {
         	loadBlocks();
             dispatchThread = new Thread(this);
             dispatchThread.start();
+        }
+        //only initialize the following two if custom amount of drops is enabled...
+        if(customdrops) {
+        	loadClayBlocks();
+        	pm.registerEvent(Event.Type.BLOCK_BREAK, blockListener, Priority.Normal, this);
+        	pm.registerEvent(Event.Type.BLOCK_PHYSICS, blockListener, Priority.Normal, this);
+        }else if(defaultclaydrop != 4 && defaultclaydrop > 0) {
+        	//let's activate this if we are changing the clay drop amount
+        	pm.registerEvent(Event.Type.BLOCK_BREAK, blockListener, Priority.Normal, this);
         }
        
 
@@ -160,10 +178,15 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		        String needactivator = reminderSettings.getProperty("needactivator", "true");
 		        String wateractivator = reminderSettings.getProperty("wateractivated", "true");
 		        String lavaactivator = reminderSettings.getProperty("lavaactivated", "true");
+		        String defaultamount = reminderSettings.getProperty("defaultdropamount", "4");
 		        String afarm = reminderSettings.getProperty("clayfarm", "false");
 		        String fdelay = reminderSettings.getProperty("farmdelay", "5");
 		        String mfdelay = reminderSettings.getProperty("maxdelay", "12");
 		        String sfarm = reminderSettings.getProperty("savefarm", "false");
+		        String cdrops = reminderSettings.getProperty("customdrops", "false");
+		        String smaxclay = reminderSettings.getProperty("maxclay", "6");
+		        String sminclay = reminderSettings.getProperty("minclay", "1");
+		        String sclaytime = reminderSettings.getProperty("timeformaxclay", "12");
 		        //If the version isn't set, the file must be at 0.2
 		        String theversion = reminderSettings.getProperty("version", "0.2");
 			    try {
@@ -176,6 +199,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    lavaenabled = stringToBool(lavaactivator);
 			    clayfarm = stringToBool(afarm);
 			    savefarm = stringToBool(sfarm);
+			    customdrops = stringToBool(cdrops);
 		        try {
 			    	activateblock = Integer.parseInt(activatorblock.trim());
 			    	if(!mcmmomode) {
@@ -191,12 +215,34 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    } catch (Exception ex) {
 			    	
 			    }
+
+			    try {
+			    	defaultclaydrop = Integer.parseInt(defaultamount.trim());
+			    } catch (Exception ex) {
+			    	
+			    }
+			    try {
+			    	maxclay = Integer.parseInt(smaxclay.trim());
+			    } catch (Exception ex) {
+			    	
+			    }
+			    try {
+			    	minclay = Integer.parseInt(sminclay.trim());
+			    } catch (Exception ex) {
+			    	
+			    }
+			    try {
+			    	timeformaxclay = Integer.parseInt(sclaytime.trim())*10*1000;
+			    } catch (Exception ex) {
+			    	
+			    }
+
 			    try {
 			    	maxfarmdelay = Integer.parseInt(mfdelay.trim());
 			    } catch (Exception ex) {
 			    	
 			    }
-			    if(dbversion < 0.5) {
+			    if(dbversion < 0.7) {
 			    	updateIni();
 			    }
 			} catch (IOException e) {
@@ -228,6 +274,8 @@ public class ClayGen extends JavaPlugin implements Runnable {
 					"wateractivated = " + waterenabled + "\n" +
 					"#Set whether lava flow will trigger the change\n" +
 					"lavaactivated = " + lavaenabled + "\n\n" +
+					"#defaultdropamount changes the default amount of clay dropped when a block is broken\n" +
+					"defaultdropamount = " + defaultclaydrop + "\n\n" +
 					"#Clayfarm sets it so that the gravel turns into clay after a delay\n" +
 					"clayfarm = " + clayfarm + "\n" +
 					"#farmdelay sets the minimum delay in 10 second intervals. 5 = 50 seconds.\n" +
@@ -238,6 +286,18 @@ public class ClayGen extends JavaPlugin implements Runnable {
 					"#you will have to replace the gravel blocks or re-run the water after server reboot.)\n" +
 					"#Only useful if you have a large (20min+) delay for the gravel turning into clay.\n" +
 					"savefarm = " + savefarm + "\n" +
+					"\n" +
+					"#The following lines let you set a custom number of clay drops based on the amount\n" +
+					"#of time that water has been running over them.\n" +
+					"#customdrops, if true, enables the custom drops\n" +
+					"customdrops = " + customdrops + "\n" +
+					"#maxclay sets the maximum amount of clay a block can give\n" +
+					"maxclay = " + maxclay + "\n" +
+					"#minclay, sets the minimum amount of clay a block can give (must be more than 0!)\n" +
+					"minclay = " + minclay + "\n" +
+					"#timeformaxclay, sets how long the player must wait for the max amount of clay\n" +
+					"# in 10 second intervals. 12 = 120 seconds.\n" +
+					"timeformaxclay = " + (timeformaxclay/10/1000) + "\n" +
 					"#Do not change anything below this line unless you know what you are doing!\n" +
 					"version = " + version);
 			outChannel.close();
@@ -284,6 +344,11 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		    	    	//Otherwise, let's convert!
 		    	    	}else {
 			    	    	thegravelblocks[i].setTypeId(CLAY);
+			    	    	//if custom amount of drops is enabled, let's add them to the queue
+			    	    	if(customdrops) {
+			            		clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
+			            		saveClayBlocks();
+			            	}
 		    	    	}
 		    		}
 		    		
@@ -382,6 +447,11 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		            	gravellist.remove(blockupdate);
 		            	ingravel.remove(blockupdate.getBlock());
 		            	blockupdate.getBlock().setTypeId(CLAY);
+		            	if(customdrops) {
+		            		blockupdate.resetTimeIn();
+		            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
+		            		saveClayBlocks();
+		            	}
 		            	//Set the pointer to the right location.
 		            	i--;
 		            	if(debug) {
@@ -517,13 +587,91 @@ public class ClayGen extends JavaPlugin implements Runnable {
 				System.out.println("ClayGen: Finished reading file!");
 			}
 		}
+	catch (Exception e) {
+		// If it doesn't work, no great loss!
+		if(debug) {
+			System.out.println("Couldn't read save file!");
+			System.out.println(e);
+		}
+	}
+		}
+		
+		void saveClayBlocks() {
+			LinkedList<SaveBlock> glocations = new LinkedList<SaveBlock>();
+			Collection cblock = clayblocks.values();
+			for(Object oblock : cblock) {
+				ClayDelay theblock = (ClayDelay)oblock;
+				glocations.add(new SaveBlock(theblock));
+			}
+			try {
+				ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(new File(claySaveFile)));
+				out.writeObject(glocations);
+				out.flush();
+				out.close();
+			}
+			catch (Exception e) {
+				if(debug) {
+					System.out.println("Couldn't write blocks!");
+					System.out.println(e);
+				}
+			}
+		}
+		
+		private void loadClayBlocks() {
+			try {
+				ObjectInputStream out = new ObjectInputStream(new FileInputStream(new File(claySaveFile)));
+				if(debug) {
+					System.out.println("ClayGen: Reading clay file.");
+				}
+				LinkedList<SaveBlock> glocations = (LinkedList<SaveBlock>) out.readObject();
+				if(debug) {
+					System.out.println("ClayGen: Turning locations into clay Blocks");
+				}
+				clayblocks.clear();
+				for(SaveBlock blocklocation : glocations) {
+					org.bukkit.World theworld = getServer().getWorld(blocklocation.getWorld());
+					Location lblock = new Location(theworld, blocklocation.getX(), 
+							blocklocation.getY(), blocklocation.getZ());
+					Block theblock = lblock.getBlock();
+					clayblocks.put(compileBlockString(theblock), new ClayDelay(theblock, blocklocation.getDelayvalue(), blocklocation.getIntime()));
+					if(debug) {
+						System.out.println("ClayGen: Reading block at: " + compileBlockString(theblock));
+					}
+				}
+				if(debug) {
+					System.out.println("ClayGen: Finished reading clay file!");
+				}
+			}
 		catch (Exception e) {
 			// If it doesn't work, no great loss!
 			if(debug) {
-				System.out.println("Couldn't read save file!");
+				System.out.println("Couldn't read clay save file!");
 				System.out.println(e);
 			}
 		}
+	}
+
+	public void clayWaterRemoved(Block block) {
+		// Let's see if it's one of the clay blocks we are tracking...
+		if(clayblocks.containsKey(compileBlockString(block))) {
+			ClayDelay theblock = clayblocks.get(compileBlockString(block));
+			block.setData((byte) getNumberOfDrops(theblock));
+			clayblocks.remove(compileBlockString(block));
+			saveClayBlocks();
+		}
+	}
+	public String compileBlockString(Block block) {
+		return block.getWorld().getName() + "." + block.getX() + "." + block.getY() + "." + block.getZ();
+	}
+	
+	int getNumberOfDrops(ClayDelay theblock) {
+		long timeelapsed = System.currentTimeMillis() - theblock.getInTime();
+		long timefor1drop = timeformaxclay/(maxclay-minclay);
+		long numberofdrops = (timeelapsed/timefor1drop) + minclay;
+		if(numberofdrops > maxclay) {
+			numberofdrops = maxclay;
+		}
+		return (int) numberofdrops;
 	}
 }
 

@@ -20,11 +20,14 @@ package Tux2.ClayGen;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.Material;
+import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockCanBuildEvent;
+import org.bukkit.event.block.BlockDispenseEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockListener;
 import org.bukkit.event.block.BlockPhysicsEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.inventory.ItemStack;
 
 /**
  * ClayGen block listener
@@ -49,6 +52,46 @@ public class ClayGenBlockListener extends BlockListener {
     	Block thegravelblock = event.getBlock();
     	if(thegravelblock.getTypeId() == GRAVEL) {
     		plugin.gravelPlaced(thegravelblock);
+    	}
+    }
+    
+    public void onBlockPhysics (BlockPhysicsEvent event) {
+    	if(event.getBlock().getTypeId() == CLAY) {
+    		if(!plugin.hasBlockNextTo(event.getBlock(), 8, 9, 10, 11)) {
+    			plugin.clayWaterRemoved(event.getBlock());
+    		}
+    	}
+    }
+    
+    public void onBlockBreak (BlockBreakEvent event) {
+    	if(event.getBlock().getTypeId() == CLAY) {
+    		Block clayblock = event.getBlock();
+    		int claycount = 0;
+    		if(plugin.customdrops) {
+    			if(plugin.clayblocks.containsKey(plugin.compileBlockString(clayblock))) {
+        			ClayDelay theblock = plugin.clayblocks.get(plugin.compileBlockString(clayblock));
+        			claycount = plugin.getNumberOfDrops(theblock);
+        			plugin.clayblocks.remove(plugin.compileBlockString(clayblock));
+        			plugin.saveClayBlocks();
+        		}else {
+            		claycount = clayblock.getData();
+        		}
+    		}else {
+    			claycount = plugin.defaultclaydrop;
+    		}
+    		
+    		//If the clay count is zero, this must be a world generated block.
+    		//Set it to the default amount of clay.
+    		if(claycount == 0) {
+    			claycount = plugin.defaultclaydrop;
+    		}
+    		//drop the items
+    		for(int i = 0; i < claycount; i++) {
+        		ItemStack claystack = new ItemStack(337);
+        		clayblock.getWorld().dropItemNaturally(clayblock.getLocation(), new ItemStack(337, 1));
+    		}
+    		//turn the block to air, disabling further drops.
+    		clayblock.setTypeId(0);
     	}
     }
 

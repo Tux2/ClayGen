@@ -46,6 +46,9 @@ public class ClayDelay implements Serializable {
 	public void setDelay(int delay) {
 		delayvalue = delay;
 	}
+	public void resetTimeIn() {
+		intime = System.currentTimeMillis();
+	}
 	public Block getBlock() {
 		return theblock;
 	}
