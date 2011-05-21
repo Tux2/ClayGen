@@ -57,8 +57,18 @@ public class ClayGenBlockListener extends BlockListener {
     
     public void onBlockPhysics (BlockPhysicsEvent event) {
     	if(event.getBlock().getTypeId() == CLAY) {
-    		if(!plugin.hasBlockNextTo(event.getBlock(), 8, 9, 10, 11)) {
-    			plugin.clayWaterRemoved(event.getBlock());
+    		if(plugin.waterenabled && plugin.lavaenabled) {
+        		if(!plugin.hasBlockNextTo(event.getBlock(), 8, 9, 10, 11)) {
+        			plugin.clayWaterRemoved(event.getBlock());
+        		}
+    		}else if(plugin.waterenabled) {
+    			if(!plugin.hasBlockNextTo(event.getBlock(), 8, 9)) {
+        			plugin.clayWaterRemoved(event.getBlock());
+        		}
+    		}else if(plugin.lavaenabled) {
+    			if(!plugin.hasBlockNextTo(event.getBlock(), 10, 11)) {
+        			plugin.clayWaterRemoved(event.getBlock());
+        		}
     		}
     	}
     }
