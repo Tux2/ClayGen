@@ -77,6 +77,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
     boolean clayfarm = false;
     boolean savefarm = false;
     boolean customdrops = false;
+    double graveltoclaychance = 100.0;
     int maxclay = 6;
     int minclay = 1;
     int defaultclaydrop = 4;
@@ -84,7 +85,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
     long timeformaxclay = 2*60*1000;
     int farmdelay = 5;
     int maxfarmdelay = 12;
-    String version = "0.7";
+    String version = "1.0";
     LinkedList<ClayDelay> gravellist = new LinkedList<ClayDelay>();
     LinkedList<Block> ingravel = new LinkedList<Block>();
     Random generator = new Random();
@@ -187,6 +188,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		        String smaxclay = reminderSettings.getProperty("maxclay", "6");
 		        String sminclay = reminderSettings.getProperty("minclay", "1");
 		        String sclaytime = reminderSettings.getProperty("timeformaxclay", "12");
+		        String sclaychance = reminderSettings.getProperty("graveltoclaychance", "100.0");
 		        //If the version isn't set, the file must be at 0.2
 		        String theversion = reminderSettings.getProperty("version", "0.2");
 			    try {
@@ -212,6 +214,12 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    double dbversion = 0.2;
 			    try {
 			    	dbversion = Double.parseDouble(theversion.trim());
+			    } catch (Exception ex) {
+			    	
+			    }
+			    
+			    try {
+			    	graveltoclaychance = Double.parseDouble(sclaychance.trim());
 			    } catch (Exception ex) {
 			    	
 			    }
@@ -242,7 +250,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    } catch (Exception ex) {
 			    	
 			    }
-			    if(dbversion < 0.7) {
+			    if(dbversion < 1.0) {
 			    	updateIni();
 			    }
 			} catch (IOException e) {
@@ -298,6 +306,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 					"#timeformaxclay, sets how long the player must wait for the max amount of clay\n" +
 					"# in 10 second intervals. 12 = 120 seconds.\n" +
 					"timeformaxclay = " + (timeformaxclay/10/1000) + "\n" +
+					"\n" +
+					"#graveltoclaychance sets the chance from 0.0% to 100.0% of the gravel turning into clay\n" +
+					"graveltoclaychance = " + graveltoclaychance + "\n" +
 					"#Do not change anything below this line unless you know what you are doing!\n" +
 					"version = " + version);
 			outChannel.close();
@@ -343,12 +354,41 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		    	    		}
 		    	    	//Otherwise, let's convert!
 		    	    	}else {
-			    	    	thegravelblocks[i].setTypeId(CLAY);
-			    	    	//if custom amount of drops is enabled, let's add them to the queue
-			    	    	if(customdrops) {
-			            		clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
-			            		saveClayBlocks();
-			            	}
+		    	    		//Is this block going to convert?
+		    	            int rand = generator.nextInt(10000);
+		    	            if(graveltoclaychance == 100.0) {
+		    	            	thegravelblocks[i].setTypeId(CLAY);
+		    	            	//if custom amount of drops is enabled, let's add them to the queue
+		    	            	if(customdrops) {
+		    	            		clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
+		    	            		saveClayBlocks();
+		    	            	}
+		    	            	//Each block gets iterated over multiple times... let's reduce the percentage.
+		    	            }else if ( rand >= (10000.0 - (graveltoclaychance * 25.0))) {
+		    	            	if(waterenabled && lavaenabled) {
+		    	            		thegravelblocks[i].setTypeId(CLAY);
+		    	            		//if custom amount of drops is enabled, let's add them to the queue
+		    	            		if(customdrops) {
+		    	            			clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
+		    	            			saveClayBlocks();
+		    	            		}
+		    	            	}else if(waterenabled) {
+		    	            		thegravelblocks[i].setTypeId(CLAY);
+		    	            		//if custom amount of drops is enabled, let's add them to the queue
+		    	            		if(customdrops) {
+		    	            			clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
+		    	            			saveClayBlocks();
+		    	            		}
+		    		            	//don't want it to happen twice as fast when there is lava...
+		    		            }else if(lavaenabled) {
+		    		            	thegravelblocks[i].setTypeId(CLAY);
+		    	            		//if custom amount of drops is enabled, let's add them to the queue
+		    	            		if(customdrops) {
+		    	            			clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
+		    	            			saveClayBlocks();
+		    	            		}
+		    		            }
+		    	    		}
 		    	    	}
 		    		}
 		    		
@@ -446,12 +486,24 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		            	//Remove the block, it's been updated!
 		            	gravellist.remove(blockupdate);
 		            	ingravel.remove(blockupdate.getBlock());
-		            	blockupdate.getBlock().setTypeId(CLAY);
-		            	if(customdrops) {
-		            		blockupdate.resetTimeIn();
-		            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
-		            		saveClayBlocks();
-		            	}
+		            	int rand = generator.nextInt(10000);
+	    	            if(graveltoclaychance == 100.0) {
+
+			            	blockupdate.getBlock().setTypeId(CLAY);
+			            	if(customdrops) {
+			            		blockupdate.resetTimeIn();
+			            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
+			            		saveClayBlocks();
+			            	}
+	    	    		}else if(rand >= (10000.0 - (graveltoclaychance * 100.0))) {
+
+			            	blockupdate.getBlock().setTypeId(CLAY);
+			            	if(customdrops) {
+			            		blockupdate.resetTimeIn();
+			            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
+			            		saveClayBlocks();
+			            	}
+	    	    		}
 		            	//Set the pointer to the right location.
 		            	i--;
 		            	if(debug) {
