@@ -85,12 +85,13 @@ public class ClayGen extends JavaPlugin implements Runnable {
     long timeformaxclay = 2*60*1000;
     int farmdelay = 5;
     int maxfarmdelay = 12;
-    String version = "1.0";
+    String version = "1.1";
     LinkedList<ClayDelay> gravellist = new LinkedList<ClayDelay>();
     LinkedList<Block> ingravel = new LinkedList<Block>();
     Random generator = new Random();
     BlockFace[] waterblocks = {BlockFace.UP, BlockFace.NORTH, BlockFace.SOUTH,
 			BlockFace.EAST, BlockFace.WEST};
+	private boolean loadchunks = false;
 
     public ClayGen(PluginLoader pluginLoader, Server instance, PluginDescriptionFile desc, File folder, File plugin, ClassLoader cLoader) {
         super();
@@ -188,6 +189,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		        String smaxclay = reminderSettings.getProperty("maxclay", "6");
 		        String sminclay = reminderSettings.getProperty("minclay", "1");
 		        String sclaytime = reminderSettings.getProperty("timeformaxclay", "12");
+		        String scloaded = reminderSettings.getProperty("keepchunksloaded", "12");
 		        String sclaychance = reminderSettings.getProperty("graveltoclaychance", "100.0");
 		        //If the version isn't set, the file must be at 0.2
 		        String theversion = reminderSettings.getProperty("version", "0.2");
@@ -202,6 +204,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    clayfarm = stringToBool(afarm);
 			    savefarm = stringToBool(sfarm);
 			    customdrops = stringToBool(cdrops);
+			    loadchunks = stringToBool(scloaded);
 		        try {
 			    	activateblock = Integer.parseInt(activatorblock.trim());
 			    	if(!mcmmomode) {
@@ -250,7 +253,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    } catch (Exception ex) {
 			    	
 			    }
-			    if(dbversion < 1.0) {
+			    if(dbversion < 1.1) {
 			    	updateIni();
 			    }
 			} catch (IOException e) {
@@ -290,6 +293,8 @@ public class ClayGen extends JavaPlugin implements Runnable {
 					"farmdelay = " + farmdelay + "\n" +
 					"#maxdelay sets the max delay in 10 second intervals. 12 = 120 seconds.\n" +
 					"maxdelay = " + maxfarmdelay + "\n" +
+					"#keepchunksloaded keeps all the chunks loaded into memory where gravel is turning into clay.\n" +
+					"keepchunksloaded = " + loadchunks + "\n" +
 					"#savefarm saves all the blocks currently being farmed for clay. (Otherwise\n" +
 					"#you will have to replace the gravel blocks or re-run the water after server reboot.)\n" +
 					"#Only useful if you have a large (20min+) delay for the gravel turning into clay.\n" +
@@ -439,86 +444,94 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			}
 			for(int i = 0; i < gravellist.size(); i++) {
 	            ClayDelay blockupdate = (ClayDelay) gravellist.get(generator.nextInt(gravellist.size()));
-	            //If they took away the gravel, or activator, let's not keep it in here...
-	            if(blockupdate.getBlock().getTypeId() == GRAVEL && 
-	            		(mcmmomode || blockupdate.getBlock().getFace(BlockFace.DOWN).getTypeId() == activateblock)) {
-		            //let's see if water farming is enabled.
-		            boolean alreadyupdated = false;
-		            if(waterenabled && lavaenabled) {
-		            	//See if there is a water block next to it...
-		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER, WATER)) {
-		            		blockupdate.upDelay(generator.nextInt(2));
-			            	if(debug) {
-			            		System.out.println("upped the int to: " + blockupdate.getDelay());
-			            	}
-		            		alreadyupdated = true;
+	            //make sure the chunk is loaded...
+	            boolean isloaded = blockupdate.getBlock().getWorld().isChunkLoaded(blockupdate.getBlock().getChunk());
+	            if( isloaded || loadchunks) {
+	            	if(!isloaded) {
+	            		blockupdate.getBlock().getWorld().loadChunk(blockupdate.getBlock().getChunk());
+	            	}
+	            	//If they took away the gravel, or activator, let's not keep it in here...
+		            if(blockupdate.getBlock().getTypeId() == GRAVEL && 
+		            		(mcmmomode || blockupdate.getBlock().getFace(BlockFace.DOWN).getTypeId() == activateblock)) {
+			            //let's see if water farming is enabled.
+			            boolean alreadyupdated = false;
+			            if(waterenabled && lavaenabled) {
+			            	//See if there is a water block next to it...
+			            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER, WATER)) {
+			            		blockupdate.upDelay(generator.nextInt(2));
+				            	if(debug) {
+				            		System.out.println("upped the int to: " + blockupdate.getDelay());
+				            	}
+			            		alreadyupdated = true;
+				            }
+			            }else if(waterenabled) {
+			            	//See if there is a water block next to it...
+			            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER, WATER)) {
+			            		blockupdate.upDelay(generator.nextInt(2));
+				            	if(debug) {
+				            		System.out.println("upped the int to: " + blockupdate.getDelay());
+				            	}
+			            		alreadyupdated = true;
+				            }
+			            	//don't want it to happen twice as fast when there is lava...
+			            }else if(lavaenabled) {
+			            	//See if there is a lava block next to it...
+			            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGLAVA, LAVA)) {
+				            	blockupdate.upDelay(generator.nextInt(2));
+				            	if(debug) {
+				            		System.out.println("upped the int to: " + blockupdate.getDelay());
+				            	}
+				            	alreadyupdated = true;
+				            }
 			            }
-		            }else if(waterenabled) {
-		            	//See if there is a water block next to it...
-		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER, WATER)) {
-		            		blockupdate.upDelay(generator.nextInt(2));
+			            if(alreadyupdated == false) {
 			            	if(debug) {
-			            		System.out.println("upped the int to: " + blockupdate.getDelay());
+			            		System.out.println("Whoops! no more flow! Removing...");
 			            	}
-		            		alreadyupdated = true;
-			            }
-		            	//don't want it to happen twice as fast when there is lava...
-		            }else if(lavaenabled) {
-		            	//See if there is a lava block next to it...
-		            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGLAVA, LAVA)) {
-			            	blockupdate.upDelay(generator.nextInt(2));
+			            	//Remove the block, it's been updated!
+			            	gravellist.remove(blockupdate);
+			            	ingravel.remove(blockupdate.getBlock());
+			            	//Set the pointer to the right location.
+			            	i--;
+			            }else if(blockupdate.getDelay() >= farmdelay || (blockupdate.getInTime()+(10000*maxfarmdelay)) <= System.currentTimeMillis()) {
+			            	//Remove the block, it's been updated!
+			            	gravellist.remove(blockupdate);
+			            	ingravel.remove(blockupdate.getBlock());
+			            	int rand = generator.nextInt(10000);
+		    	            if(graveltoclaychance == 100.0) {
+
+				            	blockupdate.getBlock().setTypeId(CLAY);
+				            	if(customdrops) {
+				            		blockupdate.resetTimeIn();
+				            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
+				            		saveClayBlocks();
+				            	}
+		    	    		}else if(rand >= (10000.0 - (graveltoclaychance * 100.0))) {
+
+				            	blockupdate.getBlock().setTypeId(CLAY);
+				            	if(customdrops) {
+				            		blockupdate.resetTimeIn();
+				            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
+				            		saveClayBlocks();
+				            	}
+		    	    		}
+			            	//Set the pointer to the right location.
+			            	i--;
 			            	if(debug) {
-			            		System.out.println("upped the int to: " + blockupdate.getDelay());
+			            		System.out.println("We now have " + gravellist.size() + " in the queue");
 			            	}
-			            	alreadyupdated = true;
-			            }
-		            }
-		            if(alreadyupdated == false) {
-		            	if(debug) {
-		            		System.out.println("Whoops! no more flow! Removing...");
-		            	}
-		            	//Remove the block, it's been updated!
+			            } 
+			            //Remove that non-gravel block
+		            }else {
 		            	gravellist.remove(blockupdate);
 		            	ingravel.remove(blockupdate.getBlock());
-		            	//Set the pointer to the right location.
-		            	i--;
-		            }else if(blockupdate.getDelay() >= farmdelay || (blockupdate.getInTime()+(10000*maxfarmdelay)) <= System.currentTimeMillis()) {
-		            	//Remove the block, it's been updated!
-		            	gravellist.remove(blockupdate);
-		            	ingravel.remove(blockupdate.getBlock());
-		            	int rand = generator.nextInt(10000);
-	    	            if(graveltoclaychance == 100.0) {
-
-			            	blockupdate.getBlock().setTypeId(CLAY);
-			            	if(customdrops) {
-			            		blockupdate.resetTimeIn();
-			            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
-			            		saveClayBlocks();
-			            	}
-	    	    		}else if(rand >= (10000.0 - (graveltoclaychance * 100.0))) {
-
-			            	blockupdate.getBlock().setTypeId(CLAY);
-			            	if(customdrops) {
-			            		blockupdate.resetTimeIn();
-			            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
-			            		saveClayBlocks();
-			            	}
-	    	    		}
-		            	//Set the pointer to the right location.
-		            	i--;
 		            	if(debug) {
 		            		System.out.println("We now have " + gravellist.size() + " in the queue");
 		            	}
-		            } 
-		            //Remove that non-gravel block
-	            }else {
-	            	gravellist.remove(blockupdate);
-	            	ingravel.remove(blockupdate.getBlock());
-	            	if(debug) {
-	            		System.out.println("We now have " + gravellist.size() + " in the queue");
-	            	}
+		            }
+	            }else if(loadchunks) {
+	            	blockupdate.getBlock().getWorld().loadChunk(blockupdate.getBlock().getChunk());
 	            }
-				
 			}
 			savedelay++;
 			if(savefarm && savedelay >= 10) {
