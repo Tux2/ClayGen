@@ -448,6 +448,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	            boolean isloaded = blockupdate.getBlock().getWorld().isChunkLoaded(blockupdate.getBlock().getChunk());
 	            if( isloaded || loadchunks) {
 	            	if(!isloaded) {
+	            		if(debug) {
+	            			System.out.println("Loading chunk...");
+	            		}
 	            		blockupdate.getBlock().getWorld().loadChunk(blockupdate.getBlock().getChunk());
 	            	}
 	            	//If they took away the gravel, or activator, let's not keep it in here...
