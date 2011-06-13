@@ -22,12 +22,20 @@ import java.io.Serializable;
 import org.bukkit.block.Block;
 
 public class ClayDelay implements Serializable {
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -2067069668818978673L;
 	Block theblock;
 	int delayvalue = 0;
-	long intime = System.currentTimeMillis();
+	long intime;
 	
+	public void setIntime(long intime) {
+		this.intime = intime;
+	}
 	ClayDelay(Block yourblock) {
 		theblock = yourblock;
+		intime = System.currentTimeMillis();
 	}
 	ClayDelay(Block yourblock, int indelay, long timeelapsed) {
 		theblock = yourblock;

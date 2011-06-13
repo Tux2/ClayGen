@@ -723,7 +723,11 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		// Let's see if it's one of the clay blocks we are tracking...
 		if(clayblocks.containsKey(compileBlockString(block))) {
 			ClayDelay theblock = clayblocks.get(compileBlockString(block));
-			block.setData((byte) getNumberOfDrops(theblock));
+			try {
+				block.setData((byte) getNumberOfDrops(theblock));
+			}catch (StackOverflowError e) {
+				
+			}
 			clayblocks.remove(compileBlockString(block));
 			saveClayBlocks();
 		}
