@@ -64,12 +64,14 @@ public class ClayGen extends JavaPlugin implements Runnable {
     private String claySaveFile = "plugins/ClayGen/claygen.clay";
     private Thread dispatchThread;
     private int activateblock = 45;
+    private boolean slowserver = false;
     public static final int CLAY = 82;
     public static final int GRAVEL = 13;
     public static final int WATER = 9;
     public static final int FLOWINGWATER = 8;
     public static final int LAVA = 11;
     public static final int FLOWINGLAVA = 10;
+    LinkedList<Block> doneblocks = new LinkedList<Block>();
     boolean debug = false;
     boolean mcmmomode = false;
     boolean lavaenabled = true;
@@ -85,7 +87,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
     long timeformaxclay = 2*60*1000;
     int farmdelay = 5;
     int maxfarmdelay = 12;
-    String version = "1.1";
+    String version = "1.3";
     LinkedList<ClayDelay> gravellist = new LinkedList<ClayDelay>();
     LinkedList<Block> ingravel = new LinkedList<Block>();
     Random generator = new Random();
@@ -118,6 +120,11 @@ public class ClayGen extends JavaPlugin implements Runnable {
         if(clayfarm) {
         	pm.registerEvent(Event.Type.BLOCK_PLACE, blockListener, Priority.Normal, this);
         	loadBlocks();
+        	if(slowserver) {
+            	getServer().getScheduler().scheduleSyncRepeatingTask(this, new ClayUpdate(this), 50L, 25L);
+        	}else {
+            	getServer().getScheduler().scheduleSyncRepeatingTask(this, new ClayUpdate(this), 200L, 100L);
+        	}
             dispatchThread = new Thread(this);
             dispatchThread.start();
         }
@@ -191,6 +198,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		        String sclaytime = reminderSettings.getProperty("timeformaxclay", "12");
 		        String scloaded = reminderSettings.getProperty("keepchunksloaded", "12");
 		        String sclaychance = reminderSettings.getProperty("graveltoclaychance", "100.0");
+		        String sslowserver = reminderSettings.getProperty("slowserver", "false");
 		        //If the version isn't set, the file must be at 0.2
 		        String theversion = reminderSettings.getProperty("version", "0.2");
 			    try {
@@ -199,6 +207,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    	
 			    }
 			    mcmmomode = !stringToBool(needactivator);
+			    slowserver = stringToBool(sslowserver);
 			    waterenabled = stringToBool(wateractivator);
 			    lavaenabled = stringToBool(lavaactivator);
 			    clayfarm = stringToBool(afarm);
@@ -253,7 +262,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    } catch (Exception ex) {
 			    	
 			    }
-			    if(dbversion < 1.1) {
+			    if(dbversion < 1.3) {
 			    	updateIni();
 			    }
 			} catch (IOException e) {
@@ -273,48 +282,51 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	private void updateIni() {
 		try {
 			BufferedWriter outChannel = new BufferedWriter(new FileWriter("plugins/ClayGen/claygen.ini"));
-			outChannel.write("#This is the main claygen config file\n" +
-					"#The ActivatorBlock is the ID of the block needed\n" +
-					"#under the gravel to make it into clay. Default is a Brick Block\n" +
-					"#If needactivator is set to false, then any gravel\n" +
-					"#block that comes in contact with flowing water\n" +
-					"#gets converted into clay.\n" +
+			outChannel.write("# This is the main claygen config file\n" +
+					"# The ActivatorBlock is the ID of the block needed\n" +
+					"# under the gravel to make it into clay. Default is a Brick Block\n" +
+					"# If needactivator is set to false, then any gravel\n" +
+					"# block that comes in contact with flowing water\n" +
+					"# gets converted into clay.\n" +
 					"activatorblock = " + activateblock + "\n" +
 					"needactivator = " + !mcmmomode + "\n" +
-					"#Set whether water flow will trigger the change\n" +
+					"# Set whether water flow will trigger the change\n" +
 					"wateractivated = " + waterenabled + "\n" +
-					"#Set whether lava flow will trigger the change\n" +
+					"# Set whether lava flow will trigger the change\n" +
 					"lavaactivated = " + lavaenabled + "\n\n" +
-					"#defaultdropamount changes the default amount of clay dropped when a block is broken\n" +
+					"# defaultdropamount changes the default amount of clay dropped when a block is broken\n" +
 					"defaultdropamount = " + defaultclaydrop + "\n\n" +
-					"#Clayfarm sets it so that the gravel turns into clay after a delay\n" +
+					"# Clayfarm sets it so that the gravel turns into clay after a delay\n" +
 					"clayfarm = " + clayfarm + "\n" +
-					"#farmdelay sets the minimum delay in 10 second intervals. 5 = 50 seconds.\n" +
+					"# farmdelay sets the minimum delay in 10 second intervals. 5 = 50 seconds.\n" +
 					"farmdelay = " + farmdelay + "\n" +
-					"#maxdelay sets the max delay in 10 second intervals. 12 = 120 seconds.\n" +
+					"# maxdelay sets the max delay in 10 second intervals. 12 = 120 seconds.\n" +
 					"maxdelay = " + maxfarmdelay + "\n" +
-					"#keepchunksloaded keeps all the chunks loaded into memory where gravel is turning into clay.\n" +
+					"# slowserver Set this to true if your server has less than 10 ticks per second\n" +
+					"# (This is only used in farming mode)\n" +
+					"slowserver = " + slowserver + "\n" +
+					"# keepchunksloaded keeps all the chunks loaded into memory where gravel is turning into clay.\n" +
 					"keepchunksloaded = " + loadchunks + "\n" +
-					"#savefarm saves all the blocks currently being farmed for clay. (Otherwise\n" +
-					"#you will have to replace the gravel blocks or re-run the water after server reboot.)\n" +
-					"#Only useful if you have a large (20min+) delay for the gravel turning into clay.\n" +
+					"# savefarm saves all the blocks currently being farmed for clay. (Otherwise\n" +
+					"# you will have to replace the gravel blocks or re-run the water after server reboot.)\n" +
+					"# Only useful if you have a large (20min+) delay for the gravel turning into clay.\n" +
 					"savefarm = " + savefarm + "\n" +
 					"\n" +
-					"#The following lines let you set a custom number of clay drops based on the amount\n" +
-					"#of time that water has been running over them.\n" +
-					"#customdrops, if true, enables the custom drops\n" +
+					"# The following lines let you set a custom number of clay drops based on the amount\n" +
+					"# of time that water has been running over them.\n" +
+					"# customdrops, if true, enables the custom drops\n" +
 					"customdrops = " + customdrops + "\n" +
-					"#maxclay sets the maximum amount of clay a block can give\n" +
+					"# maxclay sets the maximum amount of clay a block can give\n" +
 					"maxclay = " + maxclay + "\n" +
-					"#minclay, sets the minimum amount of clay a block can give (must be more than 0!)\n" +
+					"# minclay, sets the minimum amount of clay a block can give (must be more than 0!)\n" +
 					"minclay = " + minclay + "\n" +
-					"#timeformaxclay, sets how long the player must wait for the max amount of clay\n" +
+					"# timeformaxclay, sets how long the player must wait for the max amount of clay\n" +
 					"# in 10 second intervals. 12 = 120 seconds.\n" +
 					"timeformaxclay = " + (timeformaxclay/10/1000) + "\n" +
 					"\n" +
-					"#graveltoclaychance sets the chance from 0.0% to 100.0% of the gravel turning into clay\n" +
+					"# graveltoclaychance sets the chance from 0.0% to 100.0% of the gravel turning into clay\n" +
 					"graveltoclaychance = " + graveltoclaychance + "\n" +
-					"#Do not change anything below this line unless you know what you are doing!\n" +
+					"# Do not change anything below this line unless you know what you are doing!\n" +
 					"version = " + version);
 			outChannel.close();
 		} catch (Exception e) {
@@ -502,8 +514,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			            	ingravel.remove(blockupdate.getBlock());
 			            	int rand = generator.nextInt(10000);
 		    	            if(graveltoclaychance == 100.0) {
+		    	            	doneblocks.add(blockupdate.getBlock());
 
-				            	blockupdate.getBlock().setTypeId(CLAY);
+				            	//blockupdate.getBlock().setTypeId(CLAY);
 				            	if(customdrops) {
 				            		blockupdate.resetTimeIn();
 				            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
@@ -511,7 +524,8 @@ public class ClayGen extends JavaPlugin implements Runnable {
 				            	}
 		    	    		}else if(rand >= (10000.0 - (graveltoclaychance * 100.0))) {
 
-				            	blockupdate.getBlock().setTypeId(CLAY);
+		    	    			doneblocks.add(blockupdate.getBlock());
+				            	//blockupdate.getBlock().setTypeId(CLAY);
 				            	if(customdrops) {
 				            		blockupdate.resetTimeIn();
 				            		clayblocks.put(compileBlockString(blockupdate.getBlock()), blockupdate);
