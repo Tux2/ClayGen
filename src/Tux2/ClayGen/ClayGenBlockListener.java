@@ -97,7 +97,7 @@ public class ClayGenBlockListener extends BlockListener {
     		}
     		//drop the items
     		for(int i = 0; i < claycount; i++) {
-        		ItemStack claystack = new ItemStack(337);
+        		//ItemStack claystack = new ItemStack(337);
         		clayblock.getWorld().dropItemNaturally(clayblock.getLocation(), new ItemStack(337, 1));
     		}
     		//turn the block to air, disabling further drops.
