@@ -18,11 +18,7 @@
 package Tux2.ClayGen;
 
 import org.bukkit.block.Block;
-import org.bukkit.block.BlockFace;
-import org.bukkit.Material;
 import org.bukkit.event.block.BlockBreakEvent;
-import org.bukkit.event.block.BlockCanBuildEvent;
-import org.bukkit.event.block.BlockDispenseEvent;
 import org.bukkit.event.block.BlockFromToEvent;
 import org.bukkit.event.block.BlockListener;
 import org.bukkit.event.block.BlockPhysicsEvent;
@@ -97,7 +93,6 @@ public class ClayGenBlockListener extends BlockListener {
     		}
     		//drop the items
     		for(int i = 0; i < claycount; i++) {
-        		//ItemStack claystack = new ItemStack(337);
         		clayblock.getWorld().dropItemNaturally(clayblock.getLocation(), new ItemStack(337, 1));
     		}
     		//turn the block to air, disabling further drops.

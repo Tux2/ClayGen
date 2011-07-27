@@ -338,11 +338,11 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	public synchronized void convertBlocks(Block thewaterblock) {
 		int waterid = thewaterblock.getTypeId();
 		if((waterenabled && (waterid == 8 || waterid == 9)) || (lavaenabled && (waterid == 10 || waterid == 11))) {
-			Block thegravelblocks[] = {thewaterblock.getFace(BlockFace.DOWN),
-					thewaterblock.getFace(BlockFace.NORTH),
-					thewaterblock.getFace(BlockFace.SOUTH),
-					thewaterblock.getFace(BlockFace.EAST),
-					thewaterblock.getFace(BlockFace.WEST)};
+			Block thegravelblocks[] = {thewaterblock.getRelative(BlockFace.DOWN),
+					thewaterblock.getRelative(BlockFace.NORTH),
+					thewaterblock.getRelative(BlockFace.SOUTH),
+					thewaterblock.getRelative(BlockFace.EAST),
+					thewaterblock.getRelative(BlockFace.WEST)};
 			if(debug) {
 	    		System.out.println("Water is flowing...");
 	    	}
@@ -352,8 +352,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		        	if(debug) {
 		        		System.out.println("We have a gravel block here!");
 		        	}
-		    		//Block activatorblock = thegravelblocks[i].getFace(BlockFace.DOWN);
-		    		if(mcmmomode || getActivationBlock() == thegravelblocks[i].getFace(BlockFace.DOWN).getTypeId()) {
+		    		if(mcmmomode || getActivationBlock() == thegravelblocks[i].getRelative(BlockFace.DOWN).getTypeId()) {
 		    	    	if(debug) {
 		    	    		System.out.println("Found the right activator, converting to clay.");
 		    	    	}
@@ -467,7 +466,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	            	}
 	            	//If they took away the gravel, or activator, let's not keep it in here...
 		            if(blockupdate.getBlock().getTypeId() == GRAVEL && 
-		            		(mcmmomode || blockupdate.getBlock().getFace(BlockFace.DOWN).getTypeId() == activateblock)) {
+		            		(mcmmomode || blockupdate.getBlock().getRelative(BlockFace.DOWN).getTypeId() == activateblock)) {
 			            //let's see if water farming is enabled.
 			            boolean alreadyupdated = false;
 			            if(waterenabled && lavaenabled) {
@@ -561,7 +560,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	}
 	public synchronized boolean hasBlockNextTo(Block theblock, int blockid) {
 		for (int i = 0; i < waterblocks.length; i++) {
-			if(theblock.getFace(waterblocks[i]).getTypeId() == blockid) {
+			if(theblock.getRelative(waterblocks[i]).getTypeId() == blockid) {
 				return true;
 			}
 		}
@@ -570,7 +569,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	
 	public synchronized boolean hasBlockNextTo(Block theblock, int blockid, int blockid2) {
 		for (int i = 0; i < waterblocks.length; i++) {
-			int id = theblock.getFace(waterblocks[i]).getTypeId();
+			int id = theblock.getRelative(waterblocks[i]).getTypeId();
 			if(id == blockid || id == blockid2) {
 				return true;
 			}
@@ -580,7 +579,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	
 	public synchronized boolean hasBlockNextTo(Block theblock, int blockid, int blockid2, int blockid3, int blockid4) {
 		for (int i = 0; i < waterblocks.length; i++) {
-			int id = theblock.getFace(waterblocks[i]).getTypeId();
+			int id = theblock.getRelative(waterblocks[i]).getTypeId();
 			if(id == blockid || id == blockid2 || id == blockid3 || id == blockid4) {
 				return true;
 			}
@@ -589,7 +588,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	}
 
 	public synchronized void gravelPlaced(Block thegravelblock) {
-		if(thegravelblock.getTypeId() == GRAVEL && (mcmmomode || thegravelblock.getFace(BlockFace.DOWN).getTypeId() == activateblock)) {
+		if(thegravelblock.getTypeId() == GRAVEL && (mcmmomode || thegravelblock.getRelative(BlockFace.DOWN).getTypeId() == activateblock)) {
             //let's make sure we aren't adding duplicates...
 			if(!ingravel.contains(thegravelblock)) {
 				//let's see if water farming is enabled.
