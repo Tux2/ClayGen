@@ -87,7 +87,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
     long timeformaxclay = 2*60*1000;
     int farmdelay = 5;
     int maxfarmdelay = 12;
-    String version = "1.3";
+    String version = "1.4";
     LinkedList<ClayDelay> gravellist = new LinkedList<ClayDelay>();
     LinkedList<Block> ingravel = new LinkedList<Block>();
     Random generator = new Random();
