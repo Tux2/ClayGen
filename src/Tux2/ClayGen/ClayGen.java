@@ -17,25 +17,24 @@
 
 package Tux2.ClayGen;
 
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.nio.channels.FileChannel;
 import java.util.Collection;
-import java.util.Collections;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
+import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
-import net.minecraft.server.World;
 
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
@@ -44,7 +43,6 @@ import org.bukkit.Location;
 import org.bukkit.Server;
 import org.bukkit.event.Event.Priority;
 import org.bukkit.event.Event;
-import org.bukkit.event.Event.Type;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -56,7 +54,7 @@ import org.bukkit.plugin.PluginManager;
  * @author Tux2
  */
 public class ClayGen extends JavaPlugin implements Runnable {
-    private final ClayGenPlayerListener playerListener = new ClayGenPlayerListener(this);
+    //private final ClayGenPlayerListener playerListener = new ClayGenPlayerListener(this);
     private final ClayGenBlockListener blockListener = new ClayGenBlockListener(this);
     private final HashMap<Player, Boolean> debugees = new HashMap<Player, Boolean>();
     final HashMap<String, ClayDelay> clayblocks = new HashMap<String, ClayDelay>();
@@ -87,9 +85,8 @@ public class ClayGen extends JavaPlugin implements Runnable {
     long timeformaxclay = 2*60*1000;
     int farmdelay = 5;
     int maxfarmdelay = 12;
-    String version = "1.4";
-    LinkedList<ClayDelay> gravellist = new LinkedList<ClayDelay>();
-    LinkedList<Block> ingravel = new LinkedList<Block>();
+    String version = "1.5";
+    ConcurrentHashMap<String, ClayDelay> newgravellist = new ConcurrentHashMap<String, ClayDelay>();
     Random generator = new Random();
     BlockFace[] waterblocks = {BlockFace.UP, BlockFace.NORTH, BlockFace.SOUTH,
 			BlockFace.EAST, BlockFace.WEST};
@@ -358,13 +355,12 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		    	    	}
 		    	    	//If we have clayfarm mode enabled, let's add the blocks to the queue.
 		    	    	if (clayfarm) {
-		    	    		if(!ingravel.contains(thegravelblocks[i])) {
-			            		ingravel.add(thegravelblocks[i]);
-			            		gravellist.add(new ClayDelay(thegravelblocks[i]));
+		    	    		if(!newgravellist.containsKey(getBlockString(thegravelblocks[i]))) {
+		    	    			newgravellist.put(getBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
 			            		//Only start the thread if nothing is waiting...
 			            		//otherwise gravel placed really fast will trigger it
 			            		//to update too fast.
-			            		if(ingravel.size() <= 1) {
+			            		if(newgravellist.size() <= 1) {
 				                    dispatchThread.interrupt();
 			            		}
 		    	    		}
@@ -430,7 +426,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
         while (running) {
 
             // If the list is empty, wait until something gets added.
-            if (gravellist.size() == 0) {
+            if (newgravellist.size() == 0) {
             	if(debug) {
                 	System.out.println("Claygen: No more gravel to process!");
             	}
@@ -453,8 +449,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			} catch (InterruptedException e) {
 				
 			}
-			for(int i = 0; i < gravellist.size(); i++) {
-	            ClayDelay blockupdate = (ClayDelay) gravellist.get(generator.nextInt(gravellist.size()));
+            Iterator<Entry<String, ClayDelay>> listing = newgravellist.entrySet().iterator();
+			while(listing.hasNext()) {
+	            ClayDelay blockupdate = (ClayDelay) listing.next().getValue();
 	            //make sure the chunk is loaded...
 	            boolean isloaded = blockupdate.getBlock().getWorld().isChunkLoaded(blockupdate.getBlock().getChunk());
 	            if( isloaded || loadchunks) {
@@ -471,7 +468,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			            boolean alreadyupdated = false;
 			            if(waterenabled && lavaenabled) {
 			            	//See if there is a water block next to it...
-			            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER, WATER)) {
+			            	if(hasBlockNextTo(blockupdate.getBlock(), FLOWINGWATER, WATER, FLOWINGLAVA, LAVA)) {
 			            		blockupdate.upDelay(generator.nextInt(2));
 				            	if(debug) {
 				            		System.out.println("upped the int to: " + blockupdate.getDelay());
@@ -503,14 +500,10 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			            		System.out.println("Whoops! no more flow! Removing...");
 			            	}
 			            	//Remove the block, it's been updated!
-			            	gravellist.remove(blockupdate);
-			            	ingravel.remove(blockupdate.getBlock());
-			            	//Set the pointer to the right location.
-			            	i--;
+			            	listing.remove();
 			            }else if(blockupdate.getDelay() >= farmdelay || (blockupdate.getInTime()+(10000*maxfarmdelay)) <= System.currentTimeMillis()) {
 			            	//Remove the block, it's been updated!
-			            	gravellist.remove(blockupdate);
-			            	ingravel.remove(blockupdate.getBlock());
+			            	listing.remove();
 			            	int rand = generator.nextInt(10000);
 		    	            if(graveltoclaychance == 100.0) {
 		    	            	doneblocks.add(blockupdate.getBlock());
@@ -531,18 +524,15 @@ public class ClayGen extends JavaPlugin implements Runnable {
 				            		saveClayBlocks();
 				            	}
 		    	    		}
-			            	//Set the pointer to the right location.
-			            	i--;
 			            	if(debug) {
-			            		System.out.println("We now have " + gravellist.size() + " in the queue");
+			            		System.out.println("We now have " + newgravellist.size() + " in the queue");
 			            	}
 			            } 
 			            //Remove that non-gravel block
 		            }else {
-		            	gravellist.remove(blockupdate);
-		            	ingravel.remove(blockupdate.getBlock());
+		            	listing.remove();
 		            	if(debug) {
-		            		System.out.println("We now have " + gravellist.size() + " in the queue");
+		            		System.out.println("We now have " + newgravellist.size() + " in the queue");
 		            	}
 		            }
 	            }else if(loadchunks) {
@@ -590,18 +580,17 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	public synchronized void gravelPlaced(Block thegravelblock) {
 		if(thegravelblock.getTypeId() == GRAVEL && (mcmmomode || thegravelblock.getRelative(BlockFace.DOWN).getTypeId() == activateblock)) {
             //let's make sure we aren't adding duplicates...
-			if(!ingravel.contains(thegravelblock)) {
+			if(!newgravellist.containsKey(getBlockString(thegravelblock))) {
 				//let's see if water farming is enabled.
 	            boolean alreadyupdated = false;
 	            if(waterenabled) {
 	            	//See if there is a water block next to it...
 	            	if(hasBlockNextTo(thegravelblock, WATER, FLOWINGWATER)) {
-	            		ingravel.add(thegravelblock);
-	            		gravellist.add(new ClayDelay(thegravelblock));
+	            		newgravellist.put(getBlockString(thegravelblock), new ClayDelay(thegravelblock));
 	            		//Only start the thread if nothing is waiting...
 	            		//otherwise gravel placed really fast will trigger it
 	            		//to update too fast.
-	            		if(ingravel.size() <= 1) {
+	            		if(newgravellist.size() <= 1) {
 		                    dispatchThread.interrupt();
 	            		}
 	            		alreadyupdated = true;
@@ -610,12 +599,11 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	            }if(lavaenabled && !alreadyupdated) {
 	            	//See if there is a lava block next to it...
 	            	if(hasBlockNextTo(thegravelblock, LAVA, FLOWINGLAVA)) {
-	            		ingravel.add(thegravelblock);
-	            		gravellist.add(new ClayDelay(thegravelblock));
+	            		newgravellist.put(getBlockString(thegravelblock), new ClayDelay(thegravelblock));
 	            		//Only start the thread if nothing is waiting...
 	            		//otherwise gravel placed really fast will trigger it
 	            		//to update too fast.
-	            		if(ingravel.size() <= 1) {
+	            		if(newgravellist.size() <= 1) {
 		                    dispatchThread.interrupt();
 	            		}
 		            }
@@ -627,8 +615,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	
 	private void saveBlocks() {
 		LinkedList<SaveBlock> glocations = new LinkedList<SaveBlock>();
-		for(ClayDelay theblock : gravellist) {
-			glocations.add(new SaveBlock(theblock));
+		Enumeration<ClayDelay> gravellist = newgravellist.elements();
+		while(gravellist.hasMoreElements()) {
+			glocations.add(new SaveBlock(gravellist.nextElement()));
 		}
 		try {
 			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(new File(blockSaveFile)));
@@ -654,15 +643,13 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			if(debug) {
 				System.out.println("ClayGen: Turning locations into Blocks");
 			}
-			gravellist.clear();
-			ingravel.clear();
+			newgravellist.clear();
 			for(SaveBlock blocklocation : glocations) {
 				org.bukkit.World theworld = getServer().getWorld(blocklocation.getWorld());
 				Location lblock = new Location(theworld, blocklocation.getX(), 
 						blocklocation.getY(), blocklocation.getZ());
 				Block theblock = lblock.getBlock();
-				gravellist.add(new ClayDelay(theblock, blocklocation.getDelayvalue(), blocklocation.getIntime()));
-				ingravel.add(theblock);
+				newgravellist.put(getBlockString(theblock), new ClayDelay(theblock, blocklocation.getDelayvalue(), blocklocation.getIntime()));
 			}
 			if(debug) {
 				System.out.println("ClayGen: Finished reading file!");
@@ -679,7 +666,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		
 		void saveClayBlocks() {
 			LinkedList<SaveBlock> glocations = new LinkedList<SaveBlock>();
-			Collection cblock = clayblocks.values();
+			Collection<ClayDelay> cblock = clayblocks.values();
 			for(Object oblock : cblock) {
 				ClayDelay theblock = (ClayDelay)oblock;
 				glocations.add(new SaveBlock(theblock));
@@ -757,6 +744,10 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			numberofdrops = maxclay;
 		}
 		return (int) numberofdrops;
+	}
+	
+	public String getBlockString(Block block) {
+		return block.getWorld().getName() + "." + block.getX() + "." + block.getY() + "." + block.getZ();
 	}
 }
 

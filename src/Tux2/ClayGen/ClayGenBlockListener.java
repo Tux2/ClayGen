@@ -40,8 +40,10 @@ public class ClayGenBlockListener extends BlockListener {
     }
     
     public void onBlockFromTo(BlockFromToEvent event) {
-    	Block thewaterblock = event.getBlock();
-    	plugin.convertBlocks(thewaterblock);
+    	//Block thewaterblock = event.getBlock();
+    	//plugin.convertBlocks(thewaterblock);
+    	Block thewaterblock2 = event.getToBlock();
+    	plugin.convertBlocks(thewaterblock2);
     }
     
     public void onBlockPlace (BlockPlaceEvent event) {
