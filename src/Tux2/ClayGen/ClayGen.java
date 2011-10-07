@@ -724,11 +724,11 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		if(clayblocks.containsKey(compileBlockString(block))) {
 			ClayDelay theblock = clayblocks.get(compileBlockString(block));
 			try {
+				clayblocks.remove(compileBlockString(block));
 				block.setData((byte) getNumberOfDrops(theblock));
 			}catch (StackOverflowError e) {
 				
 			}
-			clayblocks.remove(compileBlockString(block));
 			saveClayBlocks();
 		}
 	}
