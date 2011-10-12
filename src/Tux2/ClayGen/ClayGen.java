@@ -39,6 +39,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
+import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Server;
 import org.bukkit.event.Event.Priority;
@@ -58,6 +59,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
     private final ClayGenBlockListener blockListener = new ClayGenBlockListener(this);
     private final HashMap<Player, Boolean> debugees = new HashMap<Player, Boolean>();
     final HashMap<String, ClayDelay> clayblocks = new HashMap<String, ClayDelay>();
+    final HashMap<String, Integer> claychunks = new HashMap<String, Integer>();
     private String blockSaveFile = "plugins/ClayGen/claygen.blocks";
     private String claySaveFile = "plugins/ClayGen/claygen.clay";
     private Thread dispatchThread;
@@ -133,6 +135,10 @@ public class ClayGen extends JavaPlugin implements Runnable {
         }else if(defaultclaydrop != 4 && defaultclaydrop > 0) {
         	//let's activate this if we are changing the clay drop amount
         	pm.registerEvent(Event.Type.BLOCK_BREAK, blockListener, Priority.Normal, this);
+        }
+        if(loadchunks) {
+        	ClaygenWorldListener cu = new ClaygenWorldListener(this);
+        	pm.registerEvent(Event.Type.CHUNK_UNLOAD, cu, Priority.Normal, this);
         }
        
 
@@ -356,6 +362,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		    	    	//If we have clayfarm mode enabled, let's add the blocks to the queue.
 		    	    	if (clayfarm) {
 		    	    		if(!newgravellist.containsKey(getBlockString(thegravelblocks[i]))) {
+		    	    			if(loadchunks) {
+				            		addBlockToChunk(thegravelblocks[i]);
+		    	    			}
 		    	    			newgravellist.put(getBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
 			            		//Only start the thread if nothing is waiting...
 			            		//otherwise gravel placed really fast will trigger it
@@ -450,17 +459,14 @@ public class ClayGen extends JavaPlugin implements Runnable {
 				
 			}
             Iterator<Entry<String, ClayDelay>> listing = newgravellist.entrySet().iterator();
+            if(debug) {
+                System.out.println("[ClayGen] Iterating over gravel. Have " + newgravellist.size() + "gravel to process.");
+            }
 			while(listing.hasNext()) {
 	            ClayDelay blockupdate = (ClayDelay) listing.next().getValue();
 	            //make sure the chunk is loaded...
 	            boolean isloaded = blockupdate.getBlock().getWorld().isChunkLoaded(blockupdate.getBlock().getChunk());
-	            if( isloaded || loadchunks) {
-	            	if(!isloaded) {
-	            		if(debug) {
-	            			System.out.println("Loading chunk...");
-	            		}
-	            		blockupdate.getBlock().getWorld().loadChunk(blockupdate.getBlock().getChunk());
-	            	}
+	            if(isloaded) {
 	            	//If they took away the gravel, or activator, let's not keep it in here...
 		            if(blockupdate.getBlock().getTypeId() == GRAVEL && 
 		            		(mcmmomode || blockupdate.getBlock().getRelative(BlockFace.DOWN).getTypeId() == activateblock)) {
@@ -500,9 +506,15 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			            		System.out.println("Whoops! no more flow! Removing...");
 			            	}
 			            	//Remove the block, it's been updated!
+			            	if(loadchunks) {
+				            	removeBlockFromChunk(blockupdate.getBlock());
+			            	}
 			            	listing.remove();
 			            }else if(blockupdate.getDelay() >= farmdelay || (blockupdate.getInTime()+(10000*maxfarmdelay)) <= System.currentTimeMillis()) {
 			            	//Remove the block, it's been updated!
+			            	if(loadchunks) {
+				            	removeBlockFromChunk(blockupdate.getBlock());
+			            	}
 			            	listing.remove();
 			            	int rand = generator.nextInt(10000);
 		    	            if(graveltoclaychance == 100.0) {
@@ -530,6 +542,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			            } 
 			            //Remove that non-gravel block
 		            }else {
+		            	if(loadchunks) {
+			            	removeBlockFromChunk(blockupdate.getBlock());
+		            	}
 		            	listing.remove();
 		            	if(debug) {
 		            		System.out.println("We now have " + newgravellist.size() + " in the queue");
@@ -578,6 +593,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	}
 
 	public synchronized void gravelPlaced(Block thegravelblock) {
+		if(debug){
+			System.out.println("[ClayGen] Gravel Placed!");
+		}
 		if(thegravelblock.getTypeId() == GRAVEL && (mcmmomode || thegravelblock.getRelative(BlockFace.DOWN).getTypeId() == activateblock)) {
             //let's make sure we aren't adding duplicates...
 			if(!newgravellist.containsKey(getBlockString(thegravelblock))) {
@@ -586,6 +604,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	            if(waterenabled) {
 	            	//See if there is a water block next to it...
 	            	if(hasBlockNextTo(thegravelblock, WATER, FLOWINGWATER)) {
+    	    			if(loadchunks) {
+		            		addBlockToChunk(thegravelblock);
+    	    			}
 	            		newgravellist.put(getBlockString(thegravelblock), new ClayDelay(thegravelblock));
 	            		//Only start the thread if nothing is waiting...
 	            		//otherwise gravel placed really fast will trigger it
@@ -599,6 +620,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	            }if(lavaenabled && !alreadyupdated) {
 	            	//See if there is a lava block next to it...
 	            	if(hasBlockNextTo(thegravelblock, LAVA, FLOWINGLAVA)) {
+    	    			if(loadchunks) {
+		            		addBlockToChunk(thegravelblock);
+    	    			}
 	            		newgravellist.put(getBlockString(thegravelblock), new ClayDelay(thegravelblock));
 	            		//Only start the thread if nothing is waiting...
 	            		//otherwise gravel placed really fast will trigger it
@@ -614,6 +638,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	}
 	
 	private void saveBlocks() {
+		if(debug) {
+			System.out.println("[ClayGen] Saving blocks");
+		}
 		LinkedList<SaveBlock> glocations = new LinkedList<SaveBlock>();
 		Enumeration<ClayDelay> gravellist = newgravellist.elements();
 		while(gravellist.hasMoreElements()) {
@@ -649,6 +676,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 				Location lblock = new Location(theworld, blocklocation.getX(), 
 						blocklocation.getY(), blocklocation.getZ());
 				Block theblock = lblock.getBlock();
+    			if(loadchunks) {
+            		addBlockToChunk(theblock);
+    			}
 				newgravellist.put(getBlockString(theblock), new ClayDelay(theblock, blocklocation.getDelayvalue(), blocklocation.getIntime()));
 			}
 			if(debug) {
@@ -667,8 +697,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		void saveClayBlocks() {
 			LinkedList<SaveBlock> glocations = new LinkedList<SaveBlock>();
 			Collection<ClayDelay> cblock = clayblocks.values();
-			for(Object oblock : cblock) {
-				ClayDelay theblock = (ClayDelay)oblock;
+			for(ClayDelay theblock : cblock) {
 				glocations.add(new SaveBlock(theblock));
 			}
 			try {
@@ -678,7 +707,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 				out.close();
 			}
 			catch (Exception e) {
-				if(debug) {
+				if(true) {
 					System.out.println("Couldn't write blocks!");
 					System.out.println(e);
 				}
@@ -748,6 +777,36 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	
 	public String getBlockString(Block block) {
 		return block.getWorld().getName() + "." + block.getX() + "." + block.getY() + "." + block.getZ();
+	}
+	
+	public String getChunkString(Chunk chunk) {
+		return chunk.getWorld().getName() + "." + chunk.getX() + "." + chunk.getZ();
+	}
+
+	public boolean canUnloadChunk(Chunk chunk) {
+		return !claychunks.containsKey(getChunkString(chunk));
+	}
+	
+	public void addBlockToChunk(Block block) {
+		if(claychunks.containsKey(getChunkString(block.getChunk()))) {
+			int theint = claychunks.get(getChunkString(block.getChunk())).intValue();
+			theint++;
+			claychunks.put(getChunkString(block.getChunk()), new Integer(theint));
+		}else {
+			claychunks.put(getChunkString(block.getChunk()), new Integer(1));
+		}
+	}
+	
+	public void removeBlockFromChunk(Block block) {
+		if(claychunks.containsKey(getChunkString(block.getChunk()))) {
+			int theint = claychunks.get(getChunkString(block.getChunk())).intValue();
+			theint--;
+			if(theint < 1) {
+				claychunks.remove(getChunkString(block.getChunk()));
+			}else {
+				claychunks.put(getChunkString(block.getChunk()), new Integer(theint));
+			}
+		}
 	}
 }
 
