@@ -1,9 +1,11 @@
 package Tux2.ClayGen;
 
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.world.ChunkUnloadEvent;
-import org.bukkit.event.world.WorldListener;
+import org.bukkit.event.Listener;
 
-public class ClaygenWorldListener extends WorldListener {
+public class ClaygenWorldListener implements Listener {
 	
 	ClayGen plugin;
 	
@@ -11,6 +13,7 @@ public class ClaygenWorldListener extends WorldListener {
 		this.plugin = plugin;
 	}
 	
+	@EventHandler(priority = EventPriority.NORMAL)
 	public void onChunkUnload(ChunkUnloadEvent event) {
 		if(!plugin.canUnloadChunk(event.getChunk())) {
 			event.setCancelled(true);

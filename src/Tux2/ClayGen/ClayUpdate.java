@@ -14,6 +14,7 @@ public class ClayUpdate implements Runnable{
 		this.plugin = plugin;
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public synchronized void run() {
 		try {

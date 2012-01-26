@@ -24,6 +24,10 @@ import org.bukkit.block.Block;
 
 public class SaveBlock implements Serializable {
 	
+	/**
+	 * 
+	 */
+	private static final long serialVersionUID = -2357763616244374913L;
 	double x = 0;
 	double y = 0;
 	double z = 0;

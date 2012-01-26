@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011  Joshua Reetz
+ * Copyright (C) 2011-2012  Joshua Reetz
 
     This program is free software: you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -42,8 +42,6 @@ import org.bukkit.entity.Player;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
 import org.bukkit.Server;
-import org.bukkit.event.Event.Priority;
-import org.bukkit.event.Event;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -56,7 +54,7 @@ import org.bukkit.plugin.PluginManager;
  */
 public class ClayGen extends JavaPlugin implements Runnable {
     //private final ClayGenPlayerListener playerListener = new ClayGenPlayerListener(this);
-    private final ClayGenBlockListener blockListener = new ClayGenBlockListener(this);
+    //private final ClayGenBlockListener blockListener = new ClayGenBlockListener(this);
     private final HashMap<Player, Boolean> debugees = new HashMap<Player, Boolean>();
     final HashMap<String, ClayDelay> clayblocks = new HashMap<String, ClayDelay>();
     final HashMap<String, Integer> claychunks = new HashMap<String, Integer>();
@@ -113,11 +111,11 @@ public class ClayGen extends JavaPlugin implements Runnable {
 
         // Register our events
         PluginManager pm = getServer().getPluginManager();
-        pm.registerEvent(Event.Type.BLOCK_FROMTO, blockListener, Priority.Normal, this);
+        pm.registerEvents(new ClayFromTo(this), this);
         //Only initialize this if the clay farm is enabled... otherwise we generate a lot
         //of unnesecary events.
         if(clayfarm) {
-        	pm.registerEvent(Event.Type.BLOCK_PLACE, blockListener, Priority.Normal, this);
+        	pm.registerEvents(new ClayPlace(this), this);
         	loadBlocks();
         	if(slowserver) {
             	getServer().getScheduler().scheduleSyncRepeatingTask(this, new ClayUpdate(this), 50L, 25L);
@@ -130,15 +128,15 @@ public class ClayGen extends JavaPlugin implements Runnable {
         //only initialize the following two if custom amount of drops is enabled...
         if(customdrops) {
         	loadClayBlocks();
-        	pm.registerEvent(Event.Type.BLOCK_BREAK, blockListener, Priority.Normal, this);
-        	pm.registerEvent(Event.Type.BLOCK_PHYSICS, blockListener, Priority.Normal, this);
+        	pm.registerEvents(new ClayBreak(this), this);
+        	pm.registerEvents(new ClayPhysics(this), this);
         }else if(defaultclaydrop != 4 && defaultclaydrop > 0) {
         	//let's activate this if we are changing the clay drop amount
-        	pm.registerEvent(Event.Type.BLOCK_BREAK, blockListener, Priority.Normal, this);
+        	pm.registerEvents(new ClayBreak(this), this);
         }
         if(loadchunks) {
         	ClaygenWorldListener cu = new ClaygenWorldListener(this);
-        	pm.registerEvent(Event.Type.CHUNK_UNLOAD, cu, Priority.Normal, this);
+        	pm.registerEvents(cu, this);
         }
        
 
@@ -660,6 +658,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		}
 	}
 	
+	@SuppressWarnings("unchecked")
 	private void loadBlocks() {
 		try {
 			ObjectInputStream out = new ObjectInputStream(new FileInputStream(new File(blockSaveFile)));
@@ -714,6 +713,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			}
 		}
 		
+		@SuppressWarnings("unchecked")
 		private void loadClayBlocks() {
 			try {
 				ObjectInputStream out = new ObjectInputStream(new FileInputStream(new File(claySaveFile)));
