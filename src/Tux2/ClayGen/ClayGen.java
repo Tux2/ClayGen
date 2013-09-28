@@ -87,7 +87,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
     long timeformaxclay = 2*60*1000;
     int farmdelay = 5;
     int maxfarmdelay = 12;
-    String version = "1.5";
+    String version = "1.7";
     ConcurrentHashMap<String, ClayDelay> newgravellist = new ConcurrentHashMap<String, ClayDelay>();
     Random generator = new Random();
     BlockFace[] waterblocks = {BlockFace.UP, BlockFace.NORTH, BlockFace.SOUTH,
@@ -268,7 +268,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    } catch (Exception ex) {
 			    	
 			    }
-			    if(dbversion < 1.3) {
+			    if(dbversion < 1.7) {
 			    	updateIni();
 			    }
 			} catch (IOException e) {
@@ -289,7 +289,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		try {
 			BufferedWriter outChannel = new BufferedWriter(new FileWriter("plugins/ClayGen/claygen.ini"));
 			outChannel.write("# This is the main claygen config file\n" +
-					"# The ActivatorBlock is the ID of the block needed\n" +
+					"# The ActivatorBlock is the Material name of the block needed\n" +
 					"# under the gravel to make it into clay. Default is a Brick Block\n" +
 					"# If needactivator is set to false, then any gravel\n" +
 					"# block that comes in contact with flowing water\n" +
