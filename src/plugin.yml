@@ -1,5 +1,5 @@
 name: ClayGen
 main: Tux2.ClayGen.ClayGen
-version: 1.6
+version: 1.7
 author: Tux2
 description: Turn gravel into clay by having Brick under the gravel and having either water or lava flow over the gravel blocks either instantly, or on a delay.

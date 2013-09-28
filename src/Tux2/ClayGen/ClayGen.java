@@ -41,7 +41,9 @@ import org.bukkit.block.BlockFace;
 import org.bukkit.entity.Player;
 import org.bukkit.Chunk;
 import org.bukkit.Location;
+import org.bukkit.Material;
 import org.bukkit.Server;
+import org.bukkit.metadata.FixedMetadataValue;
 import org.bukkit.plugin.PluginDescriptionFile;
 import org.bukkit.plugin.PluginLoader;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -61,14 +63,14 @@ public class ClayGen extends JavaPlugin implements Runnable {
     private String blockSaveFile = "plugins/ClayGen/claygen.blocks";
     private String claySaveFile = "plugins/ClayGen/claygen.clay";
     private Thread dispatchThread;
-    private int activateblock = 45;
+    private Material activateblock = Material.BRICK;
     private boolean slowserver = false;
-    public static final int CLAY = 82;
-    public static final int GRAVEL = 13;
-    public static final int WATER = 9;
-    public static final int FLOWINGWATER = 8;
-    public static final int LAVA = 11;
-    public static final int FLOWINGLAVA = 10;
+    public static final Material CLAY = Material.CLAY;
+    public static final Material GRAVEL = Material.GRAVEL;
+    public static final Material WATER = Material.STATIONARY_WATER;
+    public static final Material FLOWINGWATER = Material.WATER;
+    public static final Material LAVA = Material.STATIONARY_LAVA;
+    public static final Material FLOWINGLAVA = Material.LAVA;
     LinkedList<Block> doneblocks = new LinkedList<Block>();
     boolean debug = false;
     boolean mcmmomode = false;
@@ -168,7 +170,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 
 
 
-	public synchronized int getActivationBlock() {
+	public synchronized Material getActivationBlock() {
 		return activateblock;
 	}
 	
@@ -216,7 +218,10 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			    customdrops = stringToBool(cdrops);
 			    loadchunks = stringToBool(scloaded);
 		        try {
-			    	activateblock = Integer.parseInt(activatorblock.trim());
+		        	Material tempactivateblock = Material.getMaterial(activatorblock.trim().toUpperCase());
+		        	if(tempactivateblock != null) {
+		        		activateblock = tempactivateblock;
+		        	}
 			    	if(!mcmmomode) {
 			    		System.out.println("ClayGen: Setting activation block to: " + activatorblock.trim());
 			    	}
@@ -289,7 +294,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 					"# If needactivator is set to false, then any gravel\n" +
 					"# block that comes in contact with flowing water\n" +
 					"# gets converted into clay.\n" +
-					"activatorblock = " + activateblock + "\n" +
+					"activatorblock = " + activateblock.toString() + "\n" +
 					"needactivator = " + !mcmmomode + "\n" +
 					"# Set whether water flow will trigger the change\n" +
 					"wateractivated = " + waterenabled + "\n" +
@@ -337,8 +342,8 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	}
 
 	public synchronized void convertBlocks(Block thewaterblock) {
-		int waterid = thewaterblock.getTypeId();
-		if((waterenabled && (waterid == 8 || waterid == 9)) || (lavaenabled && (waterid == 10 || waterid == 11))) {
+		Material waterid = thewaterblock.getType();
+		if((waterenabled && (waterid == Material.STATIONARY_WATER || waterid == Material.WATER)) || (lavaenabled && (waterid == Material.STATIONARY_LAVA || waterid == Material.LAVA))) {
 			Block thegravelblocks[] = {thewaterblock.getRelative(BlockFace.DOWN),
 					thewaterblock.getRelative(BlockFace.NORTH),
 					thewaterblock.getRelative(BlockFace.SOUTH),
@@ -349,11 +354,11 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	    	}
 			for(int i = 0; i < thegravelblocks.length; i++) {
 
-		    	if(thegravelblocks[i].getTypeId() == GRAVEL) {
+		    	if(thegravelblocks[i].getType() == GRAVEL) {
 		        	if(debug) {
 		        		System.out.println("We have a gravel block here!");
 		        	}
-		    		if(mcmmomode || getActivationBlock() == thegravelblocks[i].getRelative(BlockFace.DOWN).getTypeId()) {
+		    		if(mcmmomode || getActivationBlock() == thegravelblocks[i].getRelative(BlockFace.DOWN).getType()) {
 		    	    	if(debug) {
 		    	    		System.out.println("Found the right activator, converting to clay.");
 		    	    	}
@@ -376,7 +381,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		    	    		//Is this block going to convert?
 		    	            int rand = generator.nextInt(10000);
 		    	            if(graveltoclaychance == 100.0) {
-		    	            	thegravelblocks[i].setTypeId(CLAY);
+		    	            	thegravelblocks[i].setType(CLAY);
 		    	            	//if custom amount of drops is enabled, let's add them to the queue
 		    	            	if(customdrops) {
 		    	            		clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
@@ -385,14 +390,14 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		    	            	//Each block gets iterated over multiple times... let's reduce the percentage.
 		    	            }else if ( rand >= (10000.0 - (graveltoclaychance * 25.0))) {
 		    	            	if(waterenabled && lavaenabled) {
-		    	            		thegravelblocks[i].setTypeId(CLAY);
+		    	            		thegravelblocks[i].setType(CLAY);
 		    	            		//if custom amount of drops is enabled, let's add them to the queue
 		    	            		if(customdrops) {
 		    	            			clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
 		    	            			saveClayBlocks();
 		    	            		}
 		    	            	}else if(waterenabled) {
-		    	            		thegravelblocks[i].setTypeId(CLAY);
+		    	            		thegravelblocks[i].setType(CLAY);
 		    	            		//if custom amount of drops is enabled, let's add them to the queue
 		    	            		if(customdrops) {
 		    	            			clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
@@ -400,7 +405,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		    	            		}
 		    		            	//don't want it to happen twice as fast when there is lava...
 		    		            }else if(lavaenabled) {
-		    		            	thegravelblocks[i].setTypeId(CLAY);
+		    		            	thegravelblocks[i].setType(CLAY);
 		    	            		//if custom amount of drops is enabled, let's add them to the queue
 		    	            		if(customdrops) {
 		    	            			clayblocks.put(compileBlockString(thegravelblocks[i]), new ClayDelay(thegravelblocks[i]));
@@ -466,8 +471,8 @@ public class ClayGen extends JavaPlugin implements Runnable {
 	            boolean isloaded = blockupdate.getBlock().getWorld().isChunkLoaded(blockupdate.getBlock().getChunk());
 	            if(isloaded) {
 	            	//If they took away the gravel, or activator, let's not keep it in here...
-		            if(blockupdate.getBlock().getTypeId() == GRAVEL && 
-		            		(mcmmomode || blockupdate.getBlock().getRelative(BlockFace.DOWN).getTypeId() == activateblock)) {
+		            if(blockupdate.getBlock().getType() == GRAVEL && 
+		            		(mcmmomode || blockupdate.getBlock().getRelative(BlockFace.DOWN).getType() == activateblock)) {
 			            //let's see if water farming is enabled.
 			            boolean alreadyupdated = false;
 			            if(waterenabled && lavaenabled) {
@@ -561,18 +566,18 @@ public class ClayGen extends JavaPlugin implements Runnable {
         }
 		
 	}
-	public synchronized boolean hasBlockNextTo(Block theblock, int blockid) {
+	public synchronized boolean hasBlockNextTo(Block theblock, Material blockid) {
 		for (int i = 0; i < waterblocks.length; i++) {
-			if(theblock.getRelative(waterblocks[i]).getTypeId() == blockid) {
+			if(theblock.getRelative(waterblocks[i]).getType() == blockid) {
 				return true;
 			}
 		}
 		return false;
 	}
 	
-	public synchronized boolean hasBlockNextTo(Block theblock, int blockid, int blockid2) {
+	public synchronized boolean hasBlockNextTo(Block theblock, Material blockid, Material blockid2) {
 		for (int i = 0; i < waterblocks.length; i++) {
-			int id = theblock.getRelative(waterblocks[i]).getTypeId();
+			Material id = theblock.getRelative(waterblocks[i]).getType();
 			if(id == blockid || id == blockid2) {
 				return true;
 			}
@@ -580,9 +585,9 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		return false;
 	}
 	
-	public synchronized boolean hasBlockNextTo(Block theblock, int blockid, int blockid2, int blockid3, int blockid4) {
+	public synchronized boolean hasBlockNextTo(Block theblock, Material blockid, Material blockid2, Material blockid3, Material blockid4) {
 		for (int i = 0; i < waterblocks.length; i++) {
-			int id = theblock.getRelative(waterblocks[i]).getTypeId();
+			Material id = theblock.getRelative(waterblocks[i]).getType();
 			if(id == blockid || id == blockid2 || id == blockid3 || id == blockid4) {
 				return true;
 			}
@@ -594,7 +599,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 		if(debug){
 			System.out.println("[ClayGen] Gravel Placed!");
 		}
-		if(thegravelblock.getTypeId() == GRAVEL && (mcmmomode || thegravelblock.getRelative(BlockFace.DOWN).getTypeId() == activateblock)) {
+		if(thegravelblock.getType() == GRAVEL && (mcmmomode || thegravelblock.getRelative(BlockFace.DOWN).getType() == activateblock)) {
             //let's make sure we aren't adding duplicates...
 			if(!newgravellist.containsKey(getBlockString(thegravelblock))) {
 				//let's see if water farming is enabled.
@@ -683,6 +688,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			if(debug) {
 				System.out.println("ClayGen: Finished reading file!");
 			}
+			out.close();
 		}
 	catch (Exception e) {
 		// If it doesn't work, no great loss!
@@ -738,6 +744,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 				if(debug) {
 					System.out.println("ClayGen: Finished reading clay file!");
 				}
+				out.close();
 			}
 		catch (Exception e) {
 			// If it doesn't work, no great loss!
@@ -754,7 +761,7 @@ public class ClayGen extends JavaPlugin implements Runnable {
 			ClayDelay theblock = clayblocks.get(compileBlockString(block));
 			try {
 				clayblocks.remove(compileBlockString(block));
-				block.setData((byte) getNumberOfDrops(theblock));
+				block.setMetadata("ClayDrops", new FixedMetadataValue(this, (byte) getNumberOfDrops(theblock)));
 			}catch (StackOverflowError e) {
 				
 			}

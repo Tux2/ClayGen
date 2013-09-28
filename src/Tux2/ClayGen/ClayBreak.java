@@ -1,5 +1,6 @@
 package Tux2.ClayGen;
 
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
@@ -10,15 +11,17 @@ import org.bukkit.inventory.ItemStack;
 public class ClayBreak implements Listener {
 	
 	ClayGen plugin;
-	public static final int CLAY = 82;
 	
 	public ClayBreak(ClayGen plugin) {
 		this.plugin = plugin;
 	}
 
-	@EventHandler(priority = EventPriority.NORMAL)
+	@EventHandler(priority = EventPriority.HIGHEST)
 	public void onBlockBreak (BlockBreakEvent event) {
-		if(event.getBlock().getTypeId() == CLAY) {
+		if(event.isCancelled()) {
+			return;
+		}
+		if(event.getBlock().getType() == Material.CLAY) {
 			Block clayblock = event.getBlock();
 			int claycount = 0;
 			if(plugin.customdrops) {
@@ -28,7 +31,10 @@ public class ClayBreak implements Listener {
 	    			plugin.clayblocks.remove(plugin.compileBlockString(clayblock));
 	    			plugin.saveClayBlocks();
 	    		}else {
-	        		claycount = clayblock.getData();
+	    			if(clayblock.hasMetadata("ClayDrops")) {
+		    			claycount = clayblock.getMetadata("ClayDrops").get(0).asByte();
+	    			}
+	        		//claycount = clayblock.getData();
 	    		}
 			}else {
 				claycount = plugin.defaultclaydrop;
@@ -41,10 +47,13 @@ public class ClayBreak implements Listener {
 			}
 			//drop the items
 			for(int i = 0; i < claycount; i++) {
-	    		clayblock.getWorld().dropItemNaturally(clayblock.getLocation(), new ItemStack(337, 1));
+	    		clayblock.getWorld().dropItemNaturally(clayblock.getLocation(), new ItemStack(Material.CLAY_BALL, 1));
 			}
 			//turn the block to air, disabling further drops.
-			clayblock.setTypeId(0);
+			if(clayblock.hasMetadata("ClayDrops")) {
+    			clayblock.removeMetadata("ClayDrops", plugin);
+			}
+			clayblock.setType(Material.AIR);
 		}
 	}
 
